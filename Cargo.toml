@@ -1,0 +1,24 @@
+[package]
+name = "cv-rust"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+image = { version = "0.24", default-features = false, features = ["png"]}
+imageproc = "0.23.0"
+log = "0.4.21"
+pretty_env_logger = "0.4.0"
+open = "2.0.2"
+rand = "0.8.4"
+tempfile = "3.3.0"
+nshare = { git = "https://github.com/rust-cv/nshare.git", rev = "cd4a5c007ecf4ef62c938a6ac64fd90edf895360", default-features = false, features = [
+    "ndarray",
+    "image",
+] }
+wide = "0.7"
+ndarray = { version = "0.15.4", default-features = false }
+derive_more = "0.99.17"
+
+
+[dev-dependencies]
+imageproc = "0.23.0"
