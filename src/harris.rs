@@ -1,25 +1,33 @@
+use std::time::Instant;
+
+use log::info;
 use ndarray::{Array2};
 
-use crate::image::{sobel_filter_x, sobel_filter_y, GrayFloatImage};
+use crate::image::{gaussian_blur, sobel_filter_x, sobel_filter_y, GrayFloatImage};
 
 pub struct Harris();
 
 impl Harris {
     pub fn corner_detector(image: &GrayFloatImage, window_size: usize, k: f32, threshold: f32) -> Vec<(usize, usize)> {
-    
-        let i_x = sobel_filter_x(image);
-        let i_y = sobel_filter_y(image);
+
+        let start = Instant::now();
+        
+        let gaussian_image = gaussian_blur(image, 2.0);
+
+        let i_x = sobel_filter_x(&gaussian_image);
+        let i_y = sobel_filter_y(&gaussian_image);
 
         let i_xx = &i_x * &i_x;
         let i_yy = &i_y * &i_y;
         let i_xy = &i_x * &i_y;
 
-        let integral_xx = integral_image(&i_xx);
-        let integral_xy = integral_image(&i_xy);
-        let integral_yy = integral_image(&i_yy);
+        let integral_xx = integral(&i_xx);
+        let integral_xy = integral(&i_xy);
+        let integral_yy = integral(&i_yy);
         
 
         let mut r = Array2::<f32>::zeros((image.height(), image.width()));
+        
 
 
         for y in 0..image.height() {
@@ -37,11 +45,13 @@ impl Harris {
              }
         }
 
-        non_maximum_suppression(&r, image.width(), image.height(), threshold)
+        let supression = non_maximum_suppression(&r, image.width(), image.height(), threshold);
+        info!("Corner detector response in : {:?}", start.elapsed());
+        supression
     }    
 }
 
-fn integral_image(img: &Array2<f32>) -> Array2<f32> {
+fn integral(img: &Array2<f32>) -> Array2<f32> {
     let (height, width) = img.dim();
     let mut integral = Array2::<f32>::zeros((height, width));
 
@@ -56,6 +66,7 @@ fn integral_image(img: &Array2<f32>) -> Array2<f32> {
     }
     integral
 }
+
 
 fn sum_rect(integral: &Array2<f32>, x: usize, y: usize, window_size: usize) -> f32 {
     let half_size = window_size / 2;
@@ -91,8 +102,7 @@ fn non_maximum_suppression(
             }
         }
     }
-    println!("corner is : {:?}", corners);
-    println!("num maximum supression succeeed");
+
     corners
 }
 

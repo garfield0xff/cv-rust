@@ -1,10 +1,27 @@
 use derive_more::{Deref, DerefMut};
 use image::{DynamicImage,ImageBuffer,Luma, Pixel};
+use imageproc::drawing::Canvas;
 use log::*;
-use ndarray::{Array2, ArrayView2};
+use ndarray::{Array, Array2, ArrayView2};
 use nshare::RefNdarray2;
+use std::f32;
 
+pub trait Kernel {
+    fn get(&self, x: usize, y: usize) -> f32;
+}
 
+impl Kernel for Vec<f32> {
+    fn get(&self, x: usize, y: usize) -> f32 {
+        let size = (self.len() as f64).sqrt() as usize;
+        self[y * size + x]
+    }
+}
+
+impl Kernel for [[i32; 3]; 3] {
+    fn get(&self, x: usize, y: usize) -> f32 {
+        self[y][x] as f32
+    }
+}
 
 // rgb , opacity ( 255, 255 )
 type GrayImageBuffer = ImageBuffer<Luma<f32>, Vec<f32>>;
@@ -142,31 +159,74 @@ impl GrayFloatImage {
 
 pub fn sobel_filter_x(image: &GrayFloatImage) -> Array2<f32>{
     let kernel: [[i32; 3]; 3] = [[-1, 0, 1], [-2, 0, 2], [-1, 0, 1]];
+    // let kernel_vec: Vec<f32> = kernel.iter().flat_map(|&row| row.iter().map(|&val| val as f32).collect::<Vec<_>>()).collect();
+    // let kernel_array: Array2<f32> = Array2::from_shape_vec((3, 3), kernel_vec).expect("Error converting to Array2");
     convolve(image, &kernel, kernel.len())
 }
 
 pub fn sobel_filter_y(image: &GrayFloatImage) -> Array2<f32>{
-    let kernel: [[i32; 3]; 3] = [[-1, -2, -1], [0, 0, 0], [1, 2, 1]];
+    let kernel:[[i32; 3]; 3]  = [[-1, -2, -1], [0, 0, 0], [1, 2, 1]];
+    // let kernel_vec: Vec<f32> = kernel.iter().flat_map(|&row| row.iter().map(|&val| val as f32).collect::<Vec<_>>()).collect();
+    // let kernel_array: Array2<f32> = Array2::from_shape_vec((3, 3), kernel_vec).expect("Error converting to Array2");
     convolve(image, &kernel, kernel.len())
 }
 
-fn convolve(image :&GrayFloatImage, kernel: &[[i32; 3]; 3], kernel_size: usize) -> Array2<f32> {
+fn gaussian(x: f32, r: f32) -> f32 {
+    ((2.0 * f32::consts::PI).sqrt() * r).recip() * (-x.powi(2) / (2.0 * r.powi(2))).exp()
+}
+
+pub fn gaussian_kernel(r: f32, kernel_size: usize) -> Vec<f32> {
+    assert!(kernel_size % 2 == 1, "kernel_size must be odd");
+    let mut kernel = vec![0f32; kernel_size];
+    let half_width = (kernel_size / 2) as i32;
+    let mut sum = 0f32;
+    for i in -half_width..=half_width {
+        let val = gaussian(i as f32, r);
+        kernel[(i + half_width) as usize] = val;
+        sum += val;
+    }
+    for val in kernel.iter_mut() {
+        *val /= sum;
+    }
+    kernel
+}
+
+pub fn gaussian_blur(image: &GrayFloatImage, r: f32) -> GrayFloatImage  {
+    let kernel_radius = (2.0 * r).ceil() as usize;
+    let kernel_size = kernel_radius * 2 + 1;
+    let kernel = gaussian_kernel(r, kernel_size);
+    
+    let blurred_array = convolve(image, &kernel, kernel_size);
+    
+    let mut blurred_image = GrayFloatImage::new(image.width() as u32, image.height() as u32);
+    for y in 0..image.height() {
+        for x in 0..image.width() {
+            let pixel_value = blurred_array[[y as usize, x as usize]];
+            blurred_image.put_pixel(x as u32, y as u32, Luma([pixel_value]));
+        }
+    }
+
+    blurred_image
+}
+
+
+fn convolve<T: Kernel>(image: &GrayFloatImage, kernel: &T, kernel_size: usize) -> Array2<f32> {
     let (width, height) = (image.width() as usize, image.height() as usize);
     let mut result = Array2::<f32>::zeros((height, width));
+    let half_k = kernel_size / 2;
 
-    for y in 1..height - 1 {
-        for x in 1..width - 1 {
+    for y in half_k..height - half_k {
+        for x in half_k..width - half_k {
             let mut sum = 0.0;
-            for ky in 0..kernel_size {
-                for kx in 0..kernel_size {
-                    let px = x + kx - 1;
-                    let py = y + ky - 1;
-                    sum += image.get(px, py) * kernel[ky][kx] as f32;
+            for ky in 0..3 {
+                for kx in 0..3 {
+                    let px = x + kx - half_k;
+                    let py = y + ky - half_k;
+                    sum += image.get(px, py) * kernel.get(kx, ky)
                 }
             }
             result[[y, x]] = sum;
         }
     }
-
     result
 }
