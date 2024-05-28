@@ -14,8 +14,8 @@ impl Harris {
         
         let gaussian_image = gaussian_blur(image, 2.0);
 
-        let i_x = sobel_filter_x(&gaussian_image);
-        let i_y = sobel_filter_y(&gaussian_image);
+        let i_x = sobel_filter_x(&image);
+        let i_y = sobel_filter_y(&image);
 
         let i_xx = &i_x * &i_x;
         let i_yy = &i_y * &i_y;
@@ -28,8 +28,6 @@ impl Harris {
 
         let mut r = Array2::<f32>::zeros((image.height(), image.width()));
         
-
-
         for y in 0..image.height() {
             for x in 0..image.width() {
                 

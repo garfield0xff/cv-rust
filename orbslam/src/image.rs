@@ -1,5 +1,5 @@
 use derive_more::{Deref, DerefMut};
-use image::{DynamicImage,ImageBuffer,Luma, Pixel};
+use image::{DynamicImage, GrayImage, ImageBuffer, Luma, Pixel};
 use imageproc::drawing::Canvas;
 use log::*;
 use ndarray::{Array, Array2, ArrayView2};
