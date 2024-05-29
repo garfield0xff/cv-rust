@@ -1,14 +1,15 @@
-use std::{fs::File, io};
-
-use reader::read_header;
+use std::fs::File;
+use std::io::{self, Read, Seek, SeekFrom};
+use byteorder::{LittleEndian, ReadBytesExt};
 
 mod reader;
 
+
 fn main() -> io::Result<()> {
-    let path = "dataset.bag";
+    let path = "bat_path";
     let mut file = File::open(path)?;
 
-    let header = read_header(&mut file)?;
+    let header = reader::read_header(&mut file)?;
     println!("{:?}", header);
 
     Ok(())
