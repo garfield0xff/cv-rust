@@ -1,6 +1,5 @@
 use derive_more::{Deref, DerefMut};
-use image::{DynamicImage, GrayImage, ImageBuffer, Luma, Pixel};
-use imageproc::drawing::Canvas;
+use image::{DynamicImage, ImageBuffer, Luma, Pixel};
 use log::*;
 use ndarray::{Array, Array2, ArrayView2};
 use nshare::RefNdarray2;
@@ -126,6 +125,13 @@ impl GrayFloatImage {
         )
     }
 
+
+    pub unsafe fn unsafe_get_pixel(&self, x: u32, y :u32) -> Luma<f32> {
+        let (width, height) = (self.width(), self.height());
+        let index = ( y * width as u32 + x ) as usize;
+        *Luma::from_slice(self.as_raw().get_unchecked(index..index + 1))
+    }
+
     pub fn get(&self, x: usize, y: usize) -> f32 {
         self.get_pixel(x as u32, y as u32)[0]
     }
@@ -154,20 +160,17 @@ impl GrayFloatImage {
         }
         array
     }
+
 }
 
 
 pub fn sobel_filter_x(image: &GrayFloatImage) -> Array2<f32>{
     let kernel: [[i32; 3]; 3] = [[-1, 0, 1], [-2, 0, 2], [-1, 0, 1]];
-    // let kernel_vec: Vec<f32> = kernel.iter().flat_map(|&row| row.iter().map(|&val| val as f32).collect::<Vec<_>>()).collect();
-    // let kernel_array: Array2<f32> = Array2::from_shape_vec((3, 3), kernel_vec).expect("Error converting to Array2");
     convolve(image, &kernel, kernel.len())
 }
 
 pub fn sobel_filter_y(image: &GrayFloatImage) -> Array2<f32>{
     let kernel:[[i32; 3]; 3]  = [[-1, -2, -1], [0, 0, 0], [1, 2, 1]];
-    // let kernel_vec: Vec<f32> = kernel.iter().flat_map(|&row| row.iter().map(|&val| val as f32).collect::<Vec<_>>()).collect();
-    // let kernel_array: Array2<f32> = Array2::from_shape_vec((3, 3), kernel_vec).expect("Error converting to Array2");
     convolve(image, &kernel, kernel.len())
 }
 

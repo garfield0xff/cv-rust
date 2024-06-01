@@ -1,5 +1,6 @@
-use std::{io::{self, Read, Seek}, str::from_utf8};
+use std::{io::{self, BufRead, Read, Seek}, str::from_utf8};
 use byteorder::{LittleEndian, ReadBytesExt};
+use log::info;
 use serde::Serialize;
 
 #[derive(Serialize, Debug)]
@@ -15,25 +16,29 @@ pub struct Record {
     data: Vec<u8>
 }
 
-pub fn read_header<R: Read + Seek>(reader: &mut R) -> io::Result<Header> {
 
-    let mut version_buf = [0;12];
-    reader.read_exact(&mut version_buf)?;
-    let version = from_utf8(&version_buf).unwrap();
-    if version != "#ROSBAG V2.0" {
-        return Err(io::Error::new(io::ErrorKind::InvalidData, "Invalid file format"))
+///  BAGS 2.0 FORMAT
+///  #ROSBAG V2.0
+///  <record 1><record 2>....<record N> 
+pub fn read_header<R: BufRead>(reader: &mut R) -> io::Result<()>{
+
+    let mut read_bytes = Vec::new();
+    reader.read_until(b'\n', &mut read_bytes).expect("failed to read buffer");
+    let header = String::from_utf8_lossy(&read_bytes);
+
+    info!("header : {}", header);
+
+    read_bytes.clear();
+
+    for _ in 0..10 {
+        reader.read_until(b'=', &mut read_bytes).expect("failed to read buffer");
+        let index_pos = String::from_utf8_lossy(&read_bytes);
+        info!("{}", index_pos);
+        read_bytes.clear();
     }
 
-    let index_pos = reader.read_u64::<LittleEndian>()?;
-    let chunk_count = reader.read_u32::<LittleEndian>()?;
-    let connection_count = reader.read_u32::<LittleEndian>()?;
-
-
-    Ok(Header {
-        index_pos,
-        chunk_count,
-        connection_count,
-    })
-    
+    Ok(())
 }
+
+
 

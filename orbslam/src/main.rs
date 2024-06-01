@@ -3,116 +3,49 @@ pub mod image;
 pub mod descriptors;
 pub mod detectors;
 pub mod harris;
-
-use std::time::Instant;
+pub mod lsd;
 
 use harris::Harris;
-use ::image::{open, GrayImage, Luma, Rgb, RgbImage};
-use imageproc::{corners::{corners_fast12, corners_fast9}, drawing::{draw_filled_circle_mut, Canvas}, point::Point};
+use lsd::lsd_detector;
+
+use std::time::Instant;
+use ::image::{open, Rgb, RgbImage};
 use log::info;
-use pretty_env_logger::init;
-use rand::Rng;
 use crate::{image::GrayFloatImage};
-
-const PATCH_SIZE: usize = 31;
-const BRIEF_SIZE: usize = 256;
-
-
-fn brief_descriptor(image: &GrayImage, x: u32, y: u32) -> Vec<u8> {
-    let mut descriptor = vec![0u8; BRIEF_SIZE];
-    let mut rng = rand::thread_rng();
-
-    for i in 0..BRIEF_SIZE {
-        let p_x = rng.gen_range(-(PATCH_SIZE as i32 / 2)..(PATCH_SIZE as i32 / 2));
-        let p_y = rng.gen_range(-(PATCH_SIZE as i32 / 2)..(PATCH_SIZE as i32 / 2));
-        let q_x = rng.gen_range(-(PATCH_SIZE as i32 / 2)..(PATCH_SIZE as i32 / 2));
-        let q_y = rng.gen_range(-(PATCH_SIZE as i32 / 2)..(PATCH_SIZE as i32 / 2));
-
-        let p = (x as i32 + p_x, y as i32 + p_y);
-        let q = (x as i32 + q_x, y as i32 + q_y);
-
-        if is_within_bounds(image, p) && is_within_bounds(image, q) {
-            let p_value = image.get_pixel(p.0 as u32, p.1 as u32)[0];
-            let q_value = image.get_pixel(q.0 as u32, q.1 as u32)[0];
-            if p_value < q_value {
-                descriptor[i] = 1;
-            }
-        }
-    }
-
-    descriptor
-}
-
-fn is_within_bounds(image: &GrayImage, point: (i32, i32)) -> bool {
-    point.0 >= 0 && point.1 >= 0 && point.0 < image.width() as i32 && point.1 < image.height() as i32
-}
-
 
 fn main() {
     
         pretty_env_logger::init();
     
-        let img_path = "/Users/gyujinkim/Desktop/Github/cv-rust/src/harris_input_test2.png";
+        let img_path = "img_path";
+
         let mut gray_image = open(&img_path).expect("failed to load image").to_luma8();
-        let output_path_fast9 = "output_fast9.png";
-        let output_path_fast12 = "output_fast12.png";
+        let gray_float_image = GrayFloatImage::load_image(&img_path);
 
-
-        // FAST9 코너 검출
         let start = Instant::now();
-        let corners_fast9 = corners_fast9(&gray_image, 30);
-        info!("Fast9 detected {} corners", corners_fast9.len());
-        info!("Fast9 detector response in : {:?}", start.elapsed());
-    
-        // FAST12 코너 검출
-        let start = Instant::now();
-        let corners_fast12 = corners_fast12(&gray_image, 30);
-        println!("Fast12 detected {} corners", corners_fast12.len());
-        info!("Fast12 detector response in : {:?}", start.elapsed());
+        let lines = lsd_detector(&gray_float_image,  1.5);
+        draw_lines(&gray_float_image, lines, "output.png");
+        info!("lsd detector response in : {:?}", start.elapsed());
 
-        let brief_descriptors_fast9: Vec<_> = corners_fast9.iter()
-        .map(|&corner| brief_descriptor(&gray_image, corner.x as u32, corner.y as u32))
-        .collect();
-    
-        info!("BRIEF descriptors for FAST9: {:?}", brief_descriptors_fast9);
-
-        let brief_descriptors_fast12: Vec<_> = corners_fast12.iter()
-        .map(|&corner| brief_descriptor(&gray_image, corner.x as u32, corner.y as u32))
-        .collect();
-
-        info!("BRIEF descriptors for FAST12: {:?}", brief_descriptors_fast12);
-
-    
-        // 그레이스케일 이미지를 RGB 이미지로 변환
-        let mut rgb_img = RgbImage::new(gray_image.width(), gray_image.height());
-        for (x, y, pixel) in gray_image.enumerate_pixels() {
-            let rgb_pixel = Rgb([pixel[0], pixel[0], pixel[0]]);
-            rgb_img.put_pixel(x, y, rgb_pixel);
-        }
-        
-        // FAST9 코너를 빨간색으로 그리기
-        for corner in corners_fast9 {
-            draw_filled_circle_mut(&mut rgb_img, (corner.x as i32, corner.y as i32), 2, Rgb([255, 0, 0]));
-        }
-    
-        // 결과 이미지 저장
-        rgb_img.save(output_path_fast9).expect("Failed to save image");
-    
-        // 새로운 RGB 이미지 생성
         let mut rgb_img = RgbImage::new(gray_image.width(), gray_image.height());
         for (x, y, pixel) in gray_image.enumerate_pixels() {
             let rgb_pixel = Rgb([pixel[0], pixel[0], pixel[0]]);
             rgb_img.put_pixel(x, y, rgb_pixel);
         }
     
-        // FAST12 코너를 빨간색으로 그리기
-        for corner in corners_fast12 {
-            draw_filled_circle_mut(&mut rgb_img, (corner.x as i32, corner.y as i32), 2, Rgb([255, 0, 0]));
+}
+
+fn draw_lines(image: &GrayFloatImage, lines: Vec<(usize, usize, f32, f32)>, output_path: &str) {
+    let mut rgb_image = RgbImage::new(image.width() as u32, image.height() as u32);
+
+    for (x, y, _mag, _dir) in lines {
+        let color = Rgb([255, 0, 0]); // 빨간색
+        if x < rgb_image.width() as usize && y < rgb_image.height() as usize {
+            rgb_image.put_pixel(x as u32, y as u32, color);
         }
-    
-        // 결과 이미지 저장
-        rgb_img.save(output_path_fast12).expect("Failed to save image");
-        
+    }
+
+    rgb_image.save(output_path).unwrap();
 }
 
 fn draw_corners(img: &mut GrayFloatImage, corners: &[(usize, usize)]) -> RgbImage{
