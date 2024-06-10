@@ -233,3 +233,53 @@ fn convolve<T: Kernel>(image: &GrayFloatImage, kernel: &T, kernel_size: usize) -
     }
     result
 }
+
+
+#[cfg(test)]
+mod test {
+    use std::{path::Path};
+    use image::{Rgb, RgbImage};
+
+    use crate::lsd::lsd_detector;
+
+    use super::{sobel_filter_x, sobel_filter_y, GrayFloatImage};
+
+    #[test]
+    fn sobel_filter_image() {
+        let img_path = "img_path";
+        let img = GrayFloatImage::load_image(&format!("{}{}", img_path, "harris_input_test3.png"));
+
+        let (i_x, i_y) =  (sobel_filter_x(&img), sobel_filter_y(&img));
+
+        let sobel_x_image = GrayFloatImage::from_array2(i_x);
+        let sobel_y_image = GrayFloatImage::from_array2(i_y);
+
+        sobel_x_image
+            .to_u8_image()
+            .save(Path::new(&format!("{}{}", img_path, "sobel_x_output.png")))
+            .expect("failed to save sobel_x_image");
+
+        sobel_y_image
+            .to_u8_image()
+            .save(Path::new(&format!("{}{}", img_path, "sobel_y_output.png")))
+            .expect("failed to save sobel_y_image");
+    }
+    
+    #[test]
+    fn lsd_image() {
+        let img_path = "img_path";
+        let img_file = format!("{}{}", img_path, "harris_input_test3.png");
+        let img = GrayFloatImage::load_image(&img_file);
+        
+        let lines = lsd_detector(&img, 0.5);
+        
+        let lsd_image = GrayFloatImage::from_array2(lines);        
+
+        lsd_image
+            .to_u8_image()
+            .save(Path::new(&format!("{}{}", img_path, "lsd_output.png")))
+            .expect("failed to save lsd iamge");
+    
+    }
+
+}
